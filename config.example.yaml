@@ -1,0 +1,63 @@
+# Example Configuration for Database Purge and Archive
+# Copy this file to config.yaml and adjust values for your environment
+
+database:
+  host: "localhost"
+  port: 5432
+  name: "production_db"
+  user: "db_user"
+  password: "db_password"  # Consider using environment variables for security
+  type: "postgresql"  # supported: postgresql, mysql, mssql
+
+# Define retention policies for each table
+# Data older than active_retention_days will be:
+#   1. Copied to the archive table
+#   2. Deleted from the active table
+retention_policies:
+  # Example: Keep last 7 days of transactions in active table
+  - table_name: "transactions"
+    active_retention_days: 7
+    archive_table: "transactions_archive"
+    date_column: "created_at"
+  
+  # Example: Keep last 15 days of logs in active table
+  - table_name: "logs"
+    active_retention_days: 15
+    archive_table: "logs_archive"
+    date_column: "log_timestamp"
+  
+  # Example: Keep last 10 days of user activity in active table
+  - table_name: "user_activity"
+    active_retention_days: 10
+    archive_table: "user_activity_archive"
+    date_column: "activity_date"
+
+# Archive settings
+archive:
+  # Automatically create archive tables if they don't exist
+  create_archive_tables: true
+  
+  # Number of records to process in one batch
+  # Larger batches = faster but more memory usage
+  # Smaller batches = slower but less memory usage
+  batch_size: 1000
+
+# Purge settings
+purge:
+  # Enable or disable purging (archiving will still happen)
+  enabled: true
+  
+  # Dry run mode: preview what would be deleted without actually deleting
+  # Set to true for testing, false for production
+  dry_run: false
+
+# Logging configuration
+logging:
+  # Log levels: DEBUG, INFO, WARNING, ERROR, CRITICAL
+  level: "INFO"
+  
+  # Path to log file
+  log_file: "purge_archive.log"
+  
+  # Also output logs to console
+  log_to_console: true
