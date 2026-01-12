@@ -1,0 +1,42 @@
+# Database Purge and Archive Configuration
+
+database:
+  host: "localhost"
+  port: 5432
+  name: "production_db"
+  user: "db_user"
+  password: "db_password"
+  type: "postgresql"  # supported: postgresql, mysql, mssql
+
+# Retention policies for active tables (in days)
+retention_policies:
+  - table_name: "transactions"
+    active_retention_days: 7
+    archive_table: "transactions_archive"
+    date_column: "created_at"
+    
+  - table_name: "logs"
+    active_retention_days: 15
+    archive_table: "logs_archive"
+    date_column: "log_timestamp"
+    
+  - table_name: "user_activity"
+    active_retention_days: 10
+    archive_table: "user_activity_archive"
+    date_column: "activity_date"
+
+# Archive settings
+archive:
+  create_archive_tables: true  # Auto-create archive tables if they don't exist
+  batch_size: 1000  # Number of records to process in one batch
+  
+# Purge settings
+purge:
+  enabled: true
+  dry_run: false  # Set to true to preview what would be deleted without actually deleting
+
+# Logging configuration
+logging:
+  level: "INFO"  # DEBUG, INFO, WARNING, ERROR, CRITICAL
+  log_file: "purge_archive.log"
+  log_to_console: true
