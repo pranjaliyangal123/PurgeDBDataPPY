@@ -59,3 +59,9 @@ coverage.xml
 tmp/
 temp/
 *.tmp
+
+# Maven/Java build artifacts
+target/
+*.class
+*.jar
+*.war
