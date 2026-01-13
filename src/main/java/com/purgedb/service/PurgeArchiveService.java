@@ -10,7 +10,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.stream.Collectors;
 
 /**
  * Service class for database purge and archive operations.
@@ -87,14 +89,13 @@ public class PurgeArchiveService {
             return new ArchivePurgeResult("FSL_REQUEST_EVENT", 0, 0);
         }
 
-        // Archive records
+        // Archive records using batch operations for better performance
         List<FslRequestEvent> recordsToArchive = fslRequestEventRepository.findOldRecords(cutoffDate);
-        int archivedCount = 0;
-        for (FslRequestEvent record : recordsToArchive) {
-            ArchiveFslRequestEvent archiveRecord = ArchiveFslRequestEvent.fromSource(record);
-            archiveFslRequestEventRepository.save(archiveRecord);
-            archivedCount++;
-        }
+        int archivedCount = archiveInBatches(
+                recordsToArchive,
+                ArchiveFslRequestEvent::fromSource,
+                archiveFslRequestEventRepository::saveAll
+        );
         logger.info("Archived {} FSL_REQUEST_EVENT records", archivedCount);
 
         // Purge records from active table
@@ -120,14 +121,13 @@ public class PurgeArchiveService {
             return new ArchivePurgeResult("EVENT_LOG_TABLE", 0, 0);
         }
 
-        // Archive records
+        // Archive records using batch operations for better performance
         List<EventLogTable> recordsToArchive = eventLogTableRepository.findOldRecords(cutoffDate);
-        int archivedCount = 0;
-        for (EventLogTable record : recordsToArchive) {
-            ArchiveEventLogTable archiveRecord = ArchiveEventLogTable.fromSource(record);
-            archiveEventLogTableRepository.save(archiveRecord);
-            archivedCount++;
-        }
+        int archivedCount = archiveInBatches(
+                recordsToArchive,
+                ArchiveEventLogTable::fromSource,
+                archiveEventLogTableRepository::saveAll
+        );
         logger.info("Archived {} EVENT_LOG_TABLE records", archivedCount);
 
         // Purge records from active table
@@ -153,14 +153,13 @@ public class PurgeArchiveService {
             return new ArchivePurgeResult("REQUEST_EVENT", 0, 0);
         }
 
-        // Archive records
+        // Archive records using batch operations for better performance
         List<RequestEvent> recordsToArchive = requestEventRepository.findOldRecords(cutoffDate);
-        int archivedCount = 0;
-        for (RequestEvent record : recordsToArchive) {
-            ArchiveRequestEvent archiveRecord = ArchiveRequestEvent.fromSource(record);
-            archiveRequestEventRepository.save(archiveRecord);
-            archivedCount++;
-        }
+        int archivedCount = archiveInBatches(
+                recordsToArchive,
+                ArchiveRequestEvent::fromSource,
+                archiveRequestEventRepository::saveAll
+        );
         logger.info("Archived {} REQUEST_EVENT records", archivedCount);
 
         // Purge records from active table
@@ -186,14 +185,13 @@ public class PurgeArchiveService {
             return new ArchivePurgeResult("REPLAY", 0, 0);
         }
 
-        // Archive records
+        // Archive records using batch operations for better performance
         List<Replay> recordsToArchive = replayRepository.findOldRecords(cutoffDate);
-        int archivedCount = 0;
-        for (Replay record : recordsToArchive) {
-            ArchiveReplay archiveRecord = ArchiveReplay.fromSource(record);
-            archiveReplayRepository.save(archiveRecord);
-            archivedCount++;
-        }
+        int archivedCount = archiveInBatches(
+                recordsToArchive,
+                ArchiveReplay::fromSource,
+                archiveReplayRepository::saveAll
+        );
         logger.info("Archived {} REPLAY records", archivedCount);
 
         // Purge records from active table
@@ -201,6 +199,45 @@ public class PurgeArchiveService {
         logger.info("Purged {} REPLAY records from active table", archivedCount);
 
         return new ArchivePurgeResult("REPLAY", archivedCount, archivedCount);
+    }
+
+    /**
+     * Generic method to archive records in batches for better performance.
+     * 
+     * @param <S> Source entity type
+     * @param <A> Archive entity type
+     * @param sourceRecords List of source records to archive
+     * @param converter Function to convert source to archive entity
+     * @param batchSaver Consumer to save a batch of archive entities
+     * @return Total number of records archived
+     */
+    private <S, A> int archiveInBatches(
+            List<S> sourceRecords,
+            java.util.function.Function<S, A> converter,
+            java.util.function.Consumer<List<A>> batchSaver) {
+        
+        int totalArchived = 0;
+        List<A> batch = new ArrayList<>(batchSize);
+        
+        for (S source : sourceRecords) {
+            batch.add(converter.apply(source));
+            
+            if (batch.size() >= batchSize) {
+                batchSaver.accept(batch);
+                totalArchived += batch.size();
+                logger.debug("Saved batch of {} records, total archived: {}", batch.size(), totalArchived);
+                batch.clear();
+            }
+        }
+        
+        // Save remaining records
+        if (!batch.isEmpty()) {
+            batchSaver.accept(batch);
+            totalArchived += batch.size();
+            logger.debug("Saved final batch of {} records, total archived: {}", batch.size(), totalArchived);
+        }
+        
+        return totalArchived;
     }
 
     /**
